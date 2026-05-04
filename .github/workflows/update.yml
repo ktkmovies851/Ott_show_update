@@ -20,7 +20,7 @@ jobs:
           pip install -r requirements.txt
           playwright install
       - run: ls -R
-      - run: python update_ott.py
+      - run: python Ottupdate.py
 
       - run: |
           git config user.name "bot"
