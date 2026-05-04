@@ -10,21 +10,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - run: |
+      # 🔥 IMPORTANT FIX (Playwright system dependencies)
+      - name: Install dependencies
+        run: |
           pip install -r requirements.txt
           playwright install
-      - run: ls -R
-      - run: python Ottupdate.py
+          playwright install-deps
 
-      - run: |
+      # Optional (debug)
+      - name: Show files
+        run: ls -R
+
+      # Run your script
+      - name: Run script
+        run: python Ottupdate.py
+
+      # Commit only if changes exist
+      - name: Commit & Push
+        run: |
           git config user.name "bot"
           git config user.email "bot@bot.com"
           git add data/*.json
-          git commit -m "auto update" || echo "no change"
-          git push
+
+          if git diff --cached --quiet; then
+            echo "no change"
+          else
+            git commit -m "auto update"
+            git push
+          fi
