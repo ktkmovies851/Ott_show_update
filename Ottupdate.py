@@ -69,7 +69,7 @@ def save_data(data):
         json.dump(zee5, f, indent=2)
 
 # =========================
-# HOTSTAR (FIXED)
+# HOTSTAR
 # =========================
 def fetch_hotstar_episodes(show_id):
 
@@ -90,22 +90,19 @@ def fetch_hotstar_episodes(show_id):
                 ]
             )
 
-            # 🔥 USER AGENT FIX
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
             )
 
             page = context.new_page()
 
-            # 🔥 BETTER LOAD
             page.goto(url, timeout=60000, wait_until="networkidle")
 
-            # 🔥 SCROLL (IMPORTANT)
+            # scroll to load episodes
             for _ in range(6):
                 page.mouse.wheel(0, 4000)
                 page.wait_for_timeout(1500)
 
-            # 🔥 EXTRA WAIT (CI SLOW)
             page.wait_for_timeout(10000)
 
             links = page.eval_on_selector_all(
@@ -114,9 +111,6 @@ def fetch_hotstar_episodes(show_id):
             )
 
             log(f"[HOTSTAR] 🔗 Total links: {len(links)}")
-
-            # DEBUG SAMPLE
-            log(f"[HOTSTAR] SAMPLE: {links[:10]}")
 
             for l in links:
                 if f"/{show_id}/" in l and "/watch" in l:
@@ -264,6 +258,10 @@ def run_update():
     data = load_serial_data()
     changed = False
 
+    if not data["serials"]:
+        log("⚠️ NO SERIALS FOUND")
+        return
+
     for s in data["serials"]:
 
         name = s.get("name")
@@ -285,23 +283,24 @@ def run_update():
         new_ids = [e["episode_id"] for e in new_eps]
         old_ids = [e["episode_id"] for e in old_eps]
 
+        log(f"📦 OLD: {old_ids}")
+        log(f"🆕 NEW: {new_ids}")
+
+        # first time
         if not old_eps:
+            log("🆕 FIRST TIME LOAD")
             s["episodes"] = new_eps
             changed = True
             continue
 
-        # 🔥 smarter detection
-new_found = False
+        # detect new
+        new_found = any(eid not in old_ids for eid in new_ids)
 
-for eid in new_ids:
-    if eid not in old_ids:
-        new_found = True
-        break
+        if not new_found:
+            log("⏭️ NO NEW EPISODE")
+            continue
 
-if not new_found:
-    log("⏭️ NO NEW EPISODE DETECTED")
-    continue
-
+        # update list
         updated = new_eps + old_eps
 
         seen = set()
@@ -314,6 +313,8 @@ if not new_found:
 
         s["episodes"] = final[:5]
         changed = True
+
+        log(f"✅ UPDATED: {[e['episode_id'] for e in s['episodes']]}")
 
     if changed:
         save_data(data)
