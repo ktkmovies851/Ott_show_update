@@ -1,1 +1,33 @@
-
+{
+  "serials": [
+    {
+      "id": 1,
+      "name": "Aase",
+      "show_id": "1260158955",
+      "ott": "hotstar",
+      "episodes": [
+        {
+          "episode_id": "1700103479",
+          "title": "Episode 1700103479"
+        },
+        {
+          "episode_id": "1700103440",
+          "title": "Episode 1700103440"
+        },
+        {
+          "episode_id": "1700103391",
+          "title": "Episode 1700103391"
+        },
+        {
+          "episode_id": "1700103326",
+          "title": "Episode 1700103326"
+        },
+        {
+          "episode_id": "1700103265",
+          "title": "Episode 1700103265"
+        }
+      ],
+      "logo": "1777784783_1777023965_1776978062_images (8).jpeg"
+    }
+  ]
+}
