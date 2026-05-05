@@ -83,42 +83,52 @@ def fetch_hotstar_episodes(show_id):
 
             browser = p.chromium.launch(
                 headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-blink-features=AutomationControlled"
-                ]
+                args=["--no-sandbox", "--disable-dev-shm-usage"]
             )
 
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+                user_agent="Mozilla/5.0 Chrome/120 Safari/537.36"
             )
 
             page = context.new_page()
 
+            api_data = []
+
+            # 🔥 CAPTURE NETWORK RESPONSES
+            def handle_response(response):
+                try:
+                    if "application/json" in response.headers.get("content-type", ""):
+                        if "hotstar" in response.url or "content" in response.url:
+                            api_data.append(response.json())
+                except:
+                    pass
+
+            page.on("response", handle_response)
+
             page.goto(url, timeout=60000, wait_until="networkidle")
-
-            # scroll to load episodes
-            for _ in range(6):
-                page.mouse.wheel(0, 4000)
-                page.wait_for_timeout(1500)
-
             page.wait_for_timeout(10000)
 
-            links = page.eval_on_selector_all(
-                "a[href]",
-                "els => els.map(e => e.href)"
-            )
-
-            log(f"[HOTSTAR] 🔗 Total links: {len(links)}")
-
-            for l in links:
-                if f"/{show_id}/" in l and "/watch" in l:
-                    for p_id in l.split("/"):
-                        if p_id.isdigit():
-                            episodes.append(p_id)
-
             browser.close()
+
+            log(f"[HOTSTAR] 📦 API responses captured: {len(api_data)}")
+
+            # 🔥 TRY TO EXTRACT EPISODES FROM JSON
+            for data in api_data:
+                try:
+                    # different possible structures
+                    items = (
+                        data.get("body", {}).get("results", []) or
+                        data.get("results", []) or
+                        data.get("data", {}).get("items", [])
+                    )
+
+                    for ep in items:
+                        eid = ep.get("id") or ep.get("contentId")
+                        if eid:
+                            episodes.append(str(eid))
+
+                except:
+                    continue
 
     except Exception as e:
         log(f"[HOTSTAR] ❌ ERROR: {e}")
@@ -130,7 +140,6 @@ def fetch_hotstar_episodes(show_id):
     log(f"[HOTSTAR] 🎯 FINAL: {final}")
 
     return [{"episode_id": e, "title": f"Episode {e}"} for e in final]
-
 # =========================
 # ZEE5
 # =========================
