@@ -83,52 +83,61 @@ def fetch_hotstar_episodes(show_id):
 
             browser = p.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"]
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage"
+                ]
             )
 
             context = browser.new_context(
-                user_agent="Mozilla/5.0 Chrome/120 Safari/537.36"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
             )
 
             page = context.new_page()
 
-            api_data = []
+            page.goto(url, timeout=60000, wait_until="domcontentloaded")
 
-            # 🔥 CAPTURE NETWORK RESPONSES
-            def handle_response(response):
-                try:
-                    if "application/json" in response.headers.get("content-type", ""):
-                        if "hotstar" in response.url or "content" in response.url:
-                            api_data.append(response.json())
-                except:
-                    pass
+            # 🔥 FORCE LOAD CONTENT LIKE REAL USER
+            for _ in range(10):
+                page.mouse.wheel(0, 5000)
+                page.wait_for_timeout(1200)
 
-            page.on("response", handle_response)
+            page.wait_for_timeout(8000)
 
-            page.goto(url, timeout=60000, wait_until="networkidle")
-            page.wait_for_timeout(10000)
+            # =========================
+            # 🔥 NEW STRATEGY: TEXT BASED EXTRACTION
+            # =========================
+
+            # Get all visible text blocks
+            blocks = page.evaluate("""
+                () => {
+                    return Array.from(document.querySelectorAll('div, span'))
+                        .map(el => el.innerText)
+                        .filter(t => t && t.length < 50);
+                }
+            """)
+
+            log(f"[HOTSTAR] 📦 TEXT BLOCKS: {len(blocks)}")
+
+            # extract episode numbers from text
+            for b in blocks:
+                match = re.findall(r'\bEpisode\\s*(\\d+)\b', b, re.IGNORECASE)
+                for m in match:
+                    episodes.append(m)
+
+            # fallback: also try URLs
+            links = page.evaluate("""
+                () => Array.from(document.querySelectorAll('a')).map(a => a.href)
+            """)
+
+            for l in links:
+                if "episode" in l.lower():
+                    parts = l.split("/")
+                    for p in parts:
+                        if p.isdigit():
+                            episodes.append(p)
 
             browser.close()
-
-            log(f"[HOTSTAR] 📦 API responses captured: {len(api_data)}")
-
-            # 🔥 TRY TO EXTRACT EPISODES FROM JSON
-            for data in api_data:
-                try:
-                    # different possible structures
-                    items = (
-                        data.get("body", {}).get("results", []) or
-                        data.get("results", []) or
-                        data.get("data", {}).get("items", [])
-                    )
-
-                    for ep in items:
-                        eid = ep.get("id") or ep.get("contentId")
-                        if eid:
-                            episodes.append(str(eid))
-
-                except:
-                    continue
 
     except Exception as e:
         log(f"[HOTSTAR] ❌ ERROR: {e}")
