@@ -290,9 +290,17 @@ def run_update():
             changed = True
             continue
 
-        if old_ids == new_ids:
-            log("⏭️ NO CHANGE")
-            continue
+        # 🔥 smarter detection
+new_found = False
+
+for eid in new_ids:
+    if eid not in old_ids:
+        new_found = True
+        break
+
+if not new_found:
+    log("⏭️ NO NEW EPISODE DETECTED")
+    continue
 
         updated = new_eps + old_eps
 
