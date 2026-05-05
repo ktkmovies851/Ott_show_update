@@ -70,7 +70,8 @@ def save_data(data):
 
 # =========================
 # HOTSTAR
-# =========================
+# ======================
+
 def fetch_hotstar_episodes(show_id):
 
     episodes = []
@@ -83,61 +84,73 @@ def fetch_hotstar_episodes(show_id):
 
             browser = p.chromium.launch(
                 headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage"
-                ]
+                args=["--no-sandbox", "--disable-dev-shm-usage"]
             )
 
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+                user_agent="Mozilla/5.0 Chrome/120 Safari/537.36"
             )
 
             page = context.new_page()
+            page.goto(url, timeout=60000, wait_until="networkidle")
 
-            page.goto(url, timeout=60000, wait_until="domcontentloaded")
-
-            # 🔥 FORCE LOAD CONTENT LIKE REAL USER
-            for _ in range(10):
-                page.mouse.wheel(0, 5000)
+            # 🔥 force scroll like real user
+            for _ in range(12):
+                page.mouse.wheel(0, 6000)
                 page.wait_for_timeout(1200)
 
             page.wait_for_timeout(8000)
 
             # =========================
-            # 🔥 NEW STRATEGY: TEXT BASED EXTRACTION
+            # 🔥 NEW STRATEGY: ARIA + DATA ATTRIBUTES
             # =========================
 
-            # Get all visible text blocks
-            blocks = page.evaluate("""
+            items = page.evaluate("""
                 () => {
-                    return Array.from(document.querySelectorAll('div, span'))
-                        .map(el => el.innerText)
-                        .filter(t => t && t.length < 50);
+                    let results = [];
+
+                    const elements = document.querySelectorAll('*');
+
+                    elements.forEach(el => {
+
+                        let text = el.innerText || "";
+
+                        // try aria-label
+                        let aria = el.getAttribute('aria-label');
+
+                        // try data attributes
+                        let dataId = el.getAttribute('data-id') ||
+                                     el.getAttribute('data-content-id') ||
+                                     el.getAttribute('data-episode-id');
+
+                        // collect episode-like patterns
+                        if (dataId) {
+                            results.push(dataId);
+                        }
+
+                        if (aria && aria.toLowerCase().includes("episode")) {
+                            let match = aria.match(/(\\d+)/g);
+                            if (match) results.push(match[0]);
+                        }
+
+                        // fallback text scan
+                        if (text && text.toLowerCase().includes("episode")) {
+                            let match = text.match(/episode\\s*(\\d+)/i);
+                            if (match) results.push(match[1]);
+                        }
+                    });
+
+                    return results;
                 }
             """)
 
-            log(f"[HOTSTAR] 📦 TEXT BLOCKS: {len(blocks)}")
-
-            # extract episode numbers from text
-            for b in blocks:
-                match = re.findall(r'\bEpisode\\s*(\\d+)\b', b, re.IGNORECASE)
-                for m in match:
-                    episodes.append(m)
-
-            # fallback: also try URLs
-            links = page.evaluate("""
-                () => Array.from(document.querySelectorAll('a')).map(a => a.href)
-            """)
-
-            for l in links:
-                if "episode" in l.lower():
-                    parts = l.split("/")
-                    for p in parts:
-                        if p.isdigit():
-                            episodes.append(p)
-
             browser.close()
+
+            log(f"[HOTSTAR] RAW IDS: {items[:20]}")
+
+            for i in items:
+                if i and i.isdigit():
+                    episodes.append(i)
 
     except Exception as e:
         log(f"[HOTSTAR] ❌ ERROR: {e}")
@@ -149,7 +162,7 @@ def fetch_hotstar_episodes(show_id):
     log(f"[HOTSTAR] 🎯 FINAL: {final}")
 
     return [{"episode_id": e, "title": f"Episode {e}"} for e in final]
-# =========================
+# ======================
 # ZEE5
 # =======================to==
 ZEE_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwbGF0Zm9ybV9jb2RlIjoiV2ViQCQhdDM4NzEyIiwiaXNzdWVkQXQiOiIyMDI2LTA0LTI4VDExOjU4OjE2LjEyOVoiLCJwcm9kdWN0X2NvZGUiOiJ6ZWU1QDk3NSIsInR0bCI6ODY0MDAwMDAsImlhdCI6MTc3NzM3NzQ5Nn0.6xLNe563-Yk9tXVFAAzQvoIJ4yTPNNInjc8fAD5FsEE"
@@ -183,8 +196,7 @@ def fetch_zee5_episodes(serial):
                 headers=headers,
                 params={
                     "episode_id": ep_id,
-                    "type": direction,
-                    "limit": 25,
+                    "type": dlimit": 25,
                     "country": "IN"
                 },
                 timeout=15
