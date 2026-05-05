@@ -151,8 +151,8 @@ def fetch_hotstar_episodes(show_id):
     return [{"episode_id": e, "title": f"Episode {e}"} for e in final]
 # =========================
 # ZEE5
-# =========================
-ZEE_TOKEN = "PASTE_YOUR_TOKEN_HERE"
+# =======================to==
+ZEE_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwbGF0Zm9ybV9jb2RlIjoiV2ViQCQhdDM4NzEyIiwiaXNzdWVkQXQiOiIyMDI2LTA0LTI4VDExOjU4OjE2LjEyOVoiLCJwcm9kdWN0X2NvZGUiOiJ6ZWU1QDk3NSIsInR0bCI6ODY0MDAwMDAsImlhdCI6MTc3NzM3NzQ5Nn0.6xLNe563-Yk9tXVFAAzQvoIJ4yTPNNInjc8fAD5FsEE"
 
 def slugify(title):
     title = title.lower()
