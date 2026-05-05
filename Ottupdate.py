@@ -69,7 +69,7 @@ def save_data(data):
         json.dump(zee5, f, indent=2)
 
 # =========================
-# HOTSTAR (UNCHANGED LOGIC)
+# HOTSTAR (FIXED)
 # =========================
 def fetch_hotstar_episodes(show_id):
 
@@ -83,18 +83,40 @@ def fetch_hotstar_episodes(show_id):
 
             browser = p.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"]
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled"
+                ]
             )
 
-            page = browser.new_page()
-            page.goto(url, timeout=60000)
+            # 🔥 USER AGENT FIX
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+            )
 
-            page.wait_for_timeout(8000)
+            page = context.new_page()
+
+            # 🔥 BETTER LOAD
+            page.goto(url, timeout=60000, wait_until="networkidle")
+
+            # 🔥 SCROLL (IMPORTANT)
+            for _ in range(6):
+                page.mouse.wheel(0, 4000)
+                page.wait_for_timeout(1500)
+
+            # 🔥 EXTRA WAIT (CI SLOW)
+            page.wait_for_timeout(10000)
 
             links = page.eval_on_selector_all(
                 "a[href]",
                 "els => els.map(e => e.href)"
             )
+
+            log(f"[HOTSTAR] 🔗 Total links: {len(links)}")
+
+            # DEBUG SAMPLE
+            log(f"[HOTSTAR] SAMPLE: {links[:10]}")
 
             for l in links:
                 if f"/{show_id}/" in l and "/watch" in l:
@@ -105,18 +127,18 @@ def fetch_hotstar_episodes(show_id):
             browser.close()
 
     except Exception as e:
-        log(f"[HOTSTAR] ❌ {e}")
+        log(f"[HOTSTAR] ❌ ERROR: {e}")
         return []
 
     unique = sorted(set(episodes), reverse=True)
     final = unique[:5]
 
-    log(f"[HOTSTAR] 🎯 {final}")
+    log(f"[HOTSTAR] 🎯 FINAL: {final}")
 
     return [{"episode_id": e, "title": f"Episode {e}"} for e in final]
 
 # =========================
-# ZEE5 (FULL SAME LOGIC)
+# ZEE5
 # =========================
 ZEE_TOKEN = "PASTE_YOUR_TOKEN_HERE"
 
@@ -183,9 +205,7 @@ def fetch_zee5_episodes(serial):
             clean.append({"episode_id": eid, "title": title})
             seen.add(eid)
 
-    # 🔥 N / N1 logic EXACT
     old_n1 = serial.get("N1") or []
-
     old_ids = [x["episode_id"] for x in old_n1]
     curr_ids = [x["episode_id"] for x in clean[:5]]
 
@@ -198,11 +218,9 @@ def fetch_zee5_episodes(serial):
     if not old_n1:
         final_order = curr_ids
         serial["anchor"] = final_order[0] if final_order else None
-
     else:
         if new_episode:
             old_anchor = old_n1[0]["episode_id"] if old_n1 else None
-
             final_order = [new_episode]
 
             if old_anchor and old_anchor != new_episode:
@@ -237,7 +255,7 @@ def fetch_zee5_episodes(serial):
     return final_output
 
 # =========================
-# MAIN RUN (ONCE)
+# MAIN
 # =========================
 def run_update():
 
@@ -261,6 +279,7 @@ def run_update():
             new_eps = fetch_hotstar_episodes(s.get("show_id"))
 
         if not new_eps:
+            log("❌ NO EPISODES FETCHED")
             continue
 
         new_ids = [e["episode_id"] for e in new_eps]
@@ -272,6 +291,7 @@ def run_update():
             continue
 
         if old_ids == new_ids:
+            log("⏭️ NO CHANGE")
             continue
 
         updated = new_eps + old_eps
